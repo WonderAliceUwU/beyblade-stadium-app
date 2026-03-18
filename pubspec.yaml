@@ -1,0 +1,49 @@
+name: beyblade_stadium
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  audioplayers: ^6.1.0
+  flutter_svg: ^2.0.10
+  video_player: ^2.9.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/metal/sounds/
+    - assets/metal/sounds/finish/
+    - assets/metal/sounds/bey-select/
+    - assets/metal/sounds/bey-win/
+    - assets/metal/sounds/bg-music/
+    - assets/metal/sounds/round/
+    - assets/metal/images/
+    - assets/metal/images/beys/
+    - assets/metal/images/motifs/
+    - assets/metal/images/attack-logo.webp
+    - assets/metal/images/balance-logo.webp
+    - assets/metal/images/defense-logo.webp
+    - assets/metal/images/stamina-logo.webp
+    - assets/metal/fonts/
+    - assets/metal/video/
+
+  fonts:
+    - family: BeybladeX
+      fonts:
+        - asset: assets/metal/fonts/Beyblade X font.ttf
+    - family: MetalFight
+      fonts:
+        - asset: assets/metal/fonts/Beyblade Metal Fight Font.ttf
