@@ -74,6 +74,9 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
     'metal/sounds/bg-music/Fly.m4a',
     'metal/sounds/bg-music/Wild Scent.opus',
     'metal/sounds/bg-music/Ryu-Kyu Humming.mp3',
+    'metal/sounds/bg-music/Ogre Has Returned.flac',
+    'metal/sounds/bg-music/Rainy and Departed.opus',
+    'metal/sounds/bg-music/Pure Malice (KIWAMI ver.).opus',
   ];
   int _currentBgIndex = 0;
   int _activePlayerIndex = 1;
@@ -1142,17 +1145,18 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
                         child: FadeTransition(opacity: animation, child: child),
                       );
                     },
-                    child: Center(
+                    child: _MarqueeText(
                       key: ValueKey<int>(_currentBgIndex),
-                      child: Text(
-                        _bgPlaylist[_currentBgIndex].split('/').last.split('.').first.toUpperCase(),
-                        style: textStyle.copyWith(
-                          fontSize: 12,
-                          color: Colors.white70,
-                          letterSpacing: 1.2,
-                        ),
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
+                      text: _bgPlaylist[_currentBgIndex]
+                          .split('/')
+                          .last
+                          .split('.')
+                          .first
+                          .toUpperCase(),
+                      style: textStyle.copyWith(
+                        fontSize: 12,
+                        color: Colors.white70,
+                        letterSpacing: 1.2,
                       ),
                     ),
                   ),
@@ -1220,6 +1224,78 @@ class _FinishButton extends StatelessWidget {
           label,
           textAlign: TextAlign.center,
           style: textStyle.copyWith(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarqueeText extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+
+  const _MarqueeText({super.key, required this.text, required this.style});
+
+  @override
+  State<_MarqueeText> createState() => _MarqueeTextState();
+}
+
+class _MarqueeTextState extends State<_MarqueeText> {
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startScrolling());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _startScrolling() async {
+    if (!mounted) return;
+    await Future.delayed(const Duration(seconds: 2));
+
+    while (mounted && _scrollController.hasClients) {
+      if (_scrollController.hasClients) {
+        final maxScroll = _scrollController.position.maxScrollExtent;
+        if (maxScroll > 0) {
+          await _scrollController.animateTo(
+            maxScroll,
+            duration: Duration(milliseconds: (maxScroll * 40).toInt()),
+            curve: Curves.linear,
+          );
+          await Future.delayed(const Duration(seconds: 2));
+          if (mounted && _scrollController.hasClients) {
+            _scrollController.jumpTo(0);
+            await Future.delayed(const Duration(seconds: 2));
+          }
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      controller: _scrollController,
+      scrollDirection: Axis.horizontal,
+      physics: const NeverScrollableScrollPhysics(),
+      child: Container(
+        alignment: Alignment.center,
+        constraints: const BoxConstraints(minWidth: 150),
+        child: Text(
+          widget.text,
+          style: widget.style,
+          maxLines: 1,
         ),
       ),
     );
