@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:video_player/video_player.dart';
@@ -38,6 +39,12 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
   String _finishText = '';
   bool _isAnimatingFinish = false;
 
+  // Win Screen State
+  bool _isGameOver = false;
+  BeyInfo? _winningBey;
+  bool _winnerIsLeft = true;
+  late AnimationController _winMotifController;
+
   final List<String> sequence = ['3', '2', '1', 'GOOO', 'SHOOT!!'];
   int currentIndex = 0;
 
@@ -45,7 +52,6 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
   final AudioPlayer _echoPlayer1 = AudioPlayer();
   final AudioPlayer _echoPlayer2 = AudioPlayer();
   
-  // Two players for seamless music crossfading
   final AudioPlayer _bgMusicPlayer1 = AudioPlayer();
   final AudioPlayer _bgMusicPlayer2 = AudioPlayer();
   final AudioPlayer _clickSfxPlayer = AudioPlayer();
@@ -57,14 +63,11 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
 
   bool _isMusicMuted = false;
 
-  // VOLUME CONSTANTS
   static const double _maxMusicVol = 0.10;
   static const double _duckMusicVol = 0.02;
 
-  // Used to manage volume fades
   int _bgMusicFadeId = 0;
 
-  // PLAYLIST CONFIG
   final List<String> _bgPlaylist = [
     'metal/sounds/bg-music/Metal Fight Theme.m4a',
     'metal/sounds/bg-music/Fatal Damage.opus',
@@ -73,7 +76,7 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
     'metal/sounds/bg-music/Ryu-Kyu Humming.mp3',
   ];
   int _currentBgIndex = 0;
-  int _activePlayerIndex = 1; // Tracks which player is currently audible
+  int _activePlayerIndex = 1;
   bool _isCrossfading = false;
   Duration? _currentSongDuration;
 
@@ -150,6 +153,11 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
       ),
     ]).animate(_finishOverlayController);
 
+    _winMotifController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+
     _setupMusicListeners(_bgMusicPlayer1);
     _setupMusicListeners(_bgMusicPlayer2);
 
@@ -202,7 +210,6 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
       _currentBgIndex = newIndex;
     });
     
-    // Switch active player index
     _activePlayerIndex = _activePlayerIndex == 1 ? 2 : 1;
     final newPlayer = _activeBgPlayer;
 
@@ -297,7 +304,7 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
     try {
       _activePlayerIndex = 1;
       setState(() {
-        _currentBgIndex = 0; // Starts with Metal Fight
+        _currentBgIndex = 0;
       });
       await _bgMusicPlayer1.setVolume(0.0);
       await _bgMusicPlayer1.play(AssetSource(_bgPlaylist[_currentBgIndex]));
@@ -385,7 +392,6 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
 
   Future<void> startCountdown() async {
     if (widget.series == BeySeries.metal && !_isMusicMuted) {
-      // Lower volume by 90% (keep 10%)
       _fadeBgMusic(_maxMusicVol * 0.1, const Duration(milliseconds: 400));
     }
 
@@ -501,6 +507,7 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
     bool hasWinner = false;
     String winnerMessage = '';
     BeyInfo? winningBey;
+    bool winnerIsLeft = true;
 
     setState(() {
       if (isLeft != null && points != null) {
@@ -514,10 +521,12 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
       if (leftScore >= 4) {
         hasWinner = true;
         winningBey = leftBey;
+        winnerIsLeft = true;
         winnerMessage = '${leftBey?.winName.toUpperCase() ?? 'PLAYER 1'} WINS';
       } else if (rightScore >= 4) {
         hasWinner = true;
         winningBey = rightBey;
+        winnerIsLeft = false;
         winnerMessage = '${rightBey?.winName.toUpperCase() ?? 'PLAYER 2'} WINS';
       }
 
@@ -529,7 +538,6 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
         _finishText = '';
         currentRound++;
         
-        // Transition to next random song when round finishes
         _handleCrossfade(random: true);
 
         Future.delayed(const Duration(milliseconds: 1000), () {
@@ -552,27 +560,37 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
       } catch (e) {
         debugPrint('Error playing win sound: $e');
       }
-      await _finishOverlayController.forward(from: 0);
-      _finishOverlayController.reset();
       
       setState(() {
-        leftScore = 0;
-        rightScore = 0;
-        currentRound = 1;
-        phase = ArenaPhase.selecting;
-        leftLocked = false;
-        rightLocked = false;
-        _isAnimatingFinish = false;
-        _finishText = '';
+        _isGameOver = true;
+        _winningBey = winningBey;
+        _winnerIsLeft = winnerIsLeft;
       });
-
-      // Always start with Metal Fight (index 0) for the next game
-      _handleCrossfade(forceIndex: 0);
-
-      Future.delayed(const Duration(milliseconds: 1000), () {
-        if (mounted) _triggerRoundAnimation(autoClose: false);
-      });
+      
+      _winMotifController.forward(from: 0);
     }
+  }
+
+  void _resetBattle() {
+    setState(() {
+      leftScore = 0;
+      rightScore = 0;
+      currentRound = 1;
+      phase = ArenaPhase.selecting;
+      leftLocked = false;
+      rightLocked = false;
+      _isAnimatingFinish = false;
+      _finishText = '';
+      _isGameOver = false;
+      _winningBey = null;
+    });
+
+    _winMotifController.reset();
+    _handleCrossfade(forceIndex: 0);
+
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      if (mounted) _triggerRoundAnimation(autoClose: false);
+    });
   }
 
   void toggleMusic() {
@@ -591,6 +609,7 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
   void dispose() {
     _countdownController.dispose();
     _finishOverlayController.dispose();
+    _winMotifController.dispose();
     _effectPlayer.dispose();
     _echoPlayer1.dispose();
     _echoPlayer2.dispose();
@@ -603,13 +622,42 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
 
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 800),
+        switchInCurve: Curves.easeInOut,
+        switchOutCurve: Curves.easeInOut,
+        layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+          return Stack(
+            children: <Widget>[
+              ...previousChildren,
+              if (currentChild != null) currentChild,
+            ],
+          );
+        },
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: Container(
+              color: Colors.black,
+              child: child,
+            ),
+          );
+        },
+        child: _isGameOver ? _buildWinScreen() : _buildBattleScreen(),
+      ),
+    );
+  }
+
+  Widget _buildBattleScreen() {
     final bothLocked = leftLocked && rightLocked;
     final interactionEnabled = phase == ArenaPhase.selecting && 
         (!_isAnimatingFinish || (_finishText.startsWith('ROUND')));
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Listener(
+    return KeyedSubtree(
+      key: const ValueKey('battle'),
+      child: Listener(
         onPointerDown: (_) => _playClickSfx(),
         behavior: HitTestBehavior.translucent,
         child: SafeArea(
@@ -841,84 +889,7 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
                 bottom: 10,
                 left: 0,
                 right: 0,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (widget.series == BeySeries.metal)
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                _isMusicMuted ? Icons.music_off : Icons.music_note,
-                                color: Colors.white54,
-                                size: 28,
-                              ),
-                              onPressed: toggleMusic,
-                            ),
-                            const SizedBox(width: 8),
-                            // REPLACED PAGEVIEW WITH ANIMATEDSWITCHER FOR STABILITY
-                            SizedBox(
-                              width: 150,
-                              height: 30,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 600),
-                                transitionBuilder: (Widget child, Animation<double> animation) {
-                                  return SlideTransition(
-                                    position: Tween<Offset>(
-                                      begin: const Offset(0.0, 0.5),
-                                      end: Offset.zero,
-                                    ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
-                                    child: FadeTransition(opacity: animation, child: child),
-                                  );
-                                },
-                                child: Center(
-                                  key: ValueKey<int>(_currentBgIndex),
-                                  child: Text(
-                                    _bgPlaylist[_currentBgIndex].split('/').last.split('.').first.toUpperCase(),
-                                    style: textStyle.copyWith(
-                                      fontSize: 12,
-                                      color: Colors.white70,
-                                      letterSpacing: 1.2,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.skip_next,
-                                color: Colors.white54,
-                                size: 28,
-                              ),
-                              onPressed: () => _handleCrossfade(random: true),
-                            ),
-                          ],
-                        ),
-                      ),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          leftScore = 0;
-                          rightScore = 0;
-                          currentRound = 1;
-                          leftLocked = false;
-                          rightLocked = false;
-                          phase = ArenaPhase.selecting;
-                        });
-                        _handleCrossfade(forceIndex: 0);
-                        _triggerRoundAnimation(autoClose: false);
-                      },
-                      child: Text('RESET ALL SCORES', 
-                        style: textStyle.copyWith(fontSize: 14, color: Colors.white54)),
-                    ),
-                  ],
-                ),
+                child: _buildMusicControls(onRight: false),
               ),
 
               if (_showVideo)
@@ -947,6 +918,275 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildWinScreen() {
+    // Capture winner info locally to prevent null crashes during AnimatedSwitcher transitions
+    final BeyInfo? winBey = _winningBey;
+    if (winBey == null) return const SizedBox.shrink();
+    
+    final Color winColor = _winnerIsLeft ? Colors.redAccent : Colors.blueAccent;
+    final double rotationSign = winBey.spin == SpinDirection.clockwise ? 1.0 : -1.0;
+    final String finishMsg = _finishText;
+    
+    return KeyedSubtree(
+      key: const ValueKey('win'),
+      child: SafeArea(
+        child: Stack(
+          children: [
+            // CENTER MOTIF (ENLARGED)
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _winMotifController,
+                builder: (context, child) {
+                  return Center(
+                    child: OverflowBox(
+                      maxWidth: double.infinity,
+                      maxHeight: double.infinity,
+                      child: Transform.scale(
+                        scale: 1.4 + (_winMotifController.value * 0.4),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // GLOW LAYER (PLAYER COLOR)
+                            Opacity(
+                              opacity: 0.2 + (_winMotifController.value * 0.1),
+                              child: ImageFiltered(
+                                imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                                child: Image.asset(
+                                  'assets/metal/images/motifs/${winBey.motif}.png',
+                                  color: winColor,
+                                  colorBlendMode: BlendMode.srcIn,
+                                  height: 800,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                            // DETAIL LAYER (ORIGINAL PNG COLORS REVEALED)
+                            Opacity(
+                              opacity: 0.4 + (_winMotifController.value * 0.2),
+                              child: Image.asset(
+                                'assets/metal/images/motifs/${winBey.motif}.png',
+                                // Using modulate at lower intensity keeps details and original colors
+                                color: winColor.withOpacity(0.3),
+                                colorBlendMode: BlendMode.modulate,
+                                height: 800,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // SPARKS
+            Positioned.fill(
+              child: RepaintBoundary(
+                child: AnimatedBuilder(
+                  animation: _winMotifController,
+                  builder: (context, child) {
+                    return SparksOverlay(
+                      spawnFactor: 0.5 + (_winMotifController.value * 0.5),
+                      color: winColor,
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // WINNER BEY CENTERED
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 60),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: const Duration(seconds: 2),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, child) {
+                      return Transform.scale(
+                        scale: 0.8 + (value * 0.2),
+                        child: Transform.rotate(
+                          angle: value * 4 * pi * rotationSign,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: winColor.withOpacity(0.4),
+                            blurRadius: 100,
+                            spreadRadius: 20,
+                          ),
+                        ],
+                      ),
+                      child: Image.asset(
+                        'assets/metal/images/beys/${winBey.name}.png',
+                        height: 400,
+                        width: 400,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  // TEXT STAYS PERMANENTLY IN WIN SCREEN
+                  AnimatedBuilder(
+                    animation: _winMotifController,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: (_winMotifController.value * 4).clamp(0.0, 1.0),
+                        child: child,
+                      );
+                    },
+                    child: Text(
+                      finishMsg,
+                      textAlign: TextAlign.center,
+                      style: textStyle.copyWith(
+                        fontSize: 80,
+                        fontWeight: FontWeight.w900,
+                        fontStyle: FontStyle.italic,
+                        letterSpacing: 4,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(color: winColor, blurRadius: 40),
+                          const Shadow(color: Colors.white, blurRadius: 10),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // START NEW BATTLE BUTTON
+            Positioned(
+              bottom: 80,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ElevatedButton(
+                  onPressed: _resetBattle,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 10,
+                  ),
+                  child: Text(
+                    'START NEW BATTLE',
+                    style: textStyle.copyWith(
+                      fontSize: 28,
+                      color: Colors.black,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // MUSIC CONTROLS ON BOTTOM RIGHT
+            Positioned(
+              bottom: 10,
+              right: 10,
+              child: _buildMusicControls(onRight: true),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMusicControls({required bool onRight}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: onRight ? CrossAxisAlignment.end : CrossAxisAlignment.center,
+      children: [
+        if (widget.series == BeySeries.metal)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: onRight ? MainAxisAlignment.end : MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    _isMusicMuted ? Icons.music_off : Icons.music_note,
+                    color: Colors.white54,
+                    size: 28,
+                  ),
+                  onPressed: toggleMusic,
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 150,
+                  height: 30,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 600),
+                    transitionBuilder: (Widget child, Animation<double> animation) {
+                      return SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0.0, 0.5),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                        child: FadeTransition(opacity: animation, child: child),
+                      );
+                    },
+                    child: Center(
+                      key: ValueKey<int>(_currentBgIndex),
+                      child: Text(
+                        _bgPlaylist[_currentBgIndex].split('/').last.split('.').first.toUpperCase(),
+                        style: textStyle.copyWith(
+                          fontSize: 12,
+                          color: Colors.white70,
+                          letterSpacing: 1.2,
+                        ),
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(
+                    Icons.skip_next,
+                    color: Colors.white54,
+                    size: 28,
+                  ),
+                  onPressed: () => _handleCrossfade(random: true),
+                ),
+              ],
+            ),
+          ),
+        if (!onRight)
+          TextButton(
+            onPressed: () {
+              setState(() {
+                leftScore = 0;
+                rightScore = 0;
+                currentRound = 1;
+                leftLocked = false;
+                rightLocked = false;
+                phase = ArenaPhase.selecting;
+              });
+              _handleCrossfade(forceIndex: 0);
+              _triggerRoundAnimation(autoClose: false);
+            },
+            child: Text('RESET ALL SCORES', 
+              style: textStyle.copyWith(fontSize: 14, color: Colors.white54)),
+          ),
+      ],
     );
   }
 }

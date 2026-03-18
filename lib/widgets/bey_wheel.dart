@@ -90,7 +90,7 @@ class BeyInfo {
       case 'leone':
         return 'Leone';
       case 'pegasis':
-        return 'Pegasis';
+        return 'Pegasus';
       case 'phoenix':
         return 'Phoenix';
       case 'sagittario':
