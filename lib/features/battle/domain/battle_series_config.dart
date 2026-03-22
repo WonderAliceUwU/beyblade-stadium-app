@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:flutter/services.dart';
+
 import '../../../screens/title_screen.dart';
 import '../../../widgets/bey_wheel.dart';
 import '../presentation/battle_series_presenter.dart';
@@ -34,6 +36,7 @@ class BattleSeriesConfig {
   final List<String> countdownSequence;
   final List<BeyInfo> beys;
   final BattleAudioConfig audio;
+  final BattleShortcutConfig shortcuts;
   final BattleSeriesPresenter presenter;
 
   const BattleSeriesConfig({
@@ -44,6 +47,7 @@ class BattleSeriesConfig {
     required this.countdownSequence,
     required this.beys,
     required this.audio,
+    required this.shortcuts,
     required this.presenter,
   });
 
@@ -57,6 +61,24 @@ class BattleSeriesConfig {
         return _xReadyConfig;
     }
   }
+}
+
+class BattleShortcutConfig {
+  final LogicalKeyboardKey leftSpinFinish;
+  final LogicalKeyboardKey leftOverFinish;
+  final LogicalKeyboardKey rightSpinFinish;
+  final LogicalKeyboardKey rightOverFinish;
+  final LogicalKeyboardKey warning;
+  final LogicalKeyboardKey primaryAction;
+
+  const BattleShortcutConfig({
+    required this.leftSpinFinish,
+    required this.leftOverFinish,
+    required this.rightSpinFinish,
+    required this.rightOverFinish,
+    required this.warning,
+    required this.primaryAction,
+  });
 }
 
 class BattleRosters {
@@ -127,6 +149,14 @@ final BattleSeriesConfig _metalConfig = BattleSeriesConfig(
     roundSoundFor: _metalRoundSound,
     finishSoundFor: _metalFinishSound,
   ),
+  shortcuts: const BattleShortcutConfig(
+    leftSpinFinish: LogicalKeyboardKey.keyQ,
+    leftOverFinish: LogicalKeyboardKey.keyA,
+    rightSpinFinish: LogicalKeyboardKey.keyP,
+    rightOverFinish: LogicalKeyboardKey.keyL,
+    warning: LogicalKeyboardKey.keyZ,
+    primaryAction: LogicalKeyboardKey.space,
+  ),
   presenter: _classicPresenter,
 );
 
@@ -146,6 +176,7 @@ final BattleSeriesConfig _xReadyConfig = BattleSeriesConfig(
     roundSoundFor: _metalRoundSound,
     finishSoundFor: _metalFinishSound,
   ),
+  shortcuts: _metalConfig.shortcuts,
   presenter: _classicPresenter,
 );
 

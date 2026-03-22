@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../features/battle/domain/battle_session_state.dart';
@@ -30,6 +31,7 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
   late final Animation<double> _finishOpacity;
   late final Animation<Offset> _finishSlide;
   late final AnimationController _winMotifController;
+  late final FocusNode _keyboardFocusNode;
 
   VideoPlayerController? _videoController;
   bool _showVideo = false;
@@ -77,6 +79,7 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
+    _keyboardFocusNode = FocusNode(debugLabel: 'battle-keyboard-focus');
     _countdownSlide = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
@@ -126,6 +129,69 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
     setState(() {
       _state = update(_state);
     });
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent || _showVideo) {
+      return KeyEventResult.ignored;
+    }
+
+    final key = event.logicalKey;
+    final shortcuts = _config.shortcuts;
+
+    if (key == shortcuts.primaryAction) {
+      _handlePrimaryActionShortcut();
+      return KeyEventResult.handled;
+    }
+
+    if (_state.isGameOver) {
+      return KeyEventResult.ignored;
+    }
+
+    if (_state.phase == ArenaPhase.countdown && !_state.isAnimatingFinish) {
+      if (key == shortcuts.warning) {
+        _triggerFinishAnimation('WARNING');
+        return KeyEventResult.handled;
+      }
+      if (key == shortcuts.leftSpinFinish) {
+        _triggerFinishAnimation('SPIN FINISH', isLeft: true, points: 1);
+        return KeyEventResult.handled;
+      }
+      if (key == shortcuts.leftOverFinish) {
+        _triggerFinishAnimation('OVER FINISH', isLeft: true, points: 2);
+        return KeyEventResult.handled;
+      }
+      if (key == shortcuts.rightSpinFinish) {
+        _triggerFinishAnimation('SPIN FINISH', isLeft: false, points: 1);
+        return KeyEventResult.handled;
+      }
+      if (key == shortcuts.rightOverFinish) {
+        _triggerFinishAnimation('OVER FINISH', isLeft: false, points: 2);
+        return KeyEventResult.handled;
+      }
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  void _handlePrimaryActionShortcut() {
+    if (_state.isGameOver || _state.phase != ArenaPhase.selecting) {
+      return;
+    }
+
+    if (!_state.leftLocked) {
+      _updateState((state) => state.copyWith(leftLocked: true));
+      return;
+    }
+
+    if (!_state.rightLocked) {
+      _updateState((state) => state.copyWith(rightLocked: true));
+      return;
+    }
+
+    if (_state.bothLocked) {
+      _startCountdown();
+    }
   }
 
   Future<void> _initVideoAndMusic() async {
@@ -452,6 +518,7 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
     _countdownController.dispose();
     _finishOverlayController.dispose();
     _winMotifController.dispose();
+    _keyboardFocusNode.dispose();
     _audio.dispose();
     _videoController?.dispose();
     super.dispose();
@@ -459,80 +526,85 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 800),
-        switchInCurve: Curves.easeInOut,
-        switchOutCurve: Curves.easeInOut,
-        layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
-          return Stack(
-            children: <Widget>[
-              ...previousChildren,
-              ...?currentChild == null ? null : [currentChild],
-            ],
-          );
-        },
-        transitionBuilder: (Widget child, Animation<double> animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: Container(color: Colors.black, child: child),
-          );
-        },
-        child: _state.isGameOver
-            ? _config.presenter.buildWinView(
-                _presentationData(),
-                _winMotifController,
-                WinPresentationCallbacks(
-                  onResetBattle: _resetBattle,
-                  onToggleMusic: _toggleMusic,
-                  onSkipTrack: () => _audio.handleCrossfade(random: true),
+    return Focus(
+      autofocus: true,
+      focusNode: _keyboardFocusNode,
+      onKeyEvent: _handleKeyEvent,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 800),
+          switchInCurve: Curves.easeInOut,
+          switchOutCurve: Curves.easeInOut,
+          layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+            return Stack(
+              children: <Widget>[
+                ...previousChildren,
+                ...?currentChild == null ? null : [currentChild],
+              ],
+            );
+          },
+          transitionBuilder: (Widget child, Animation<double> animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: Container(color: Colors.black, child: child),
+            );
+          },
+          child: _state.isGameOver
+              ? _config.presenter.buildWinView(
+                  _presentationData(),
+                  _winMotifController,
+                  WinPresentationCallbacks(
+                    onResetBattle: _resetBattle,
+                    onToggleMusic: _toggleMusic,
+                    onSkipTrack: () => _audio.handleCrossfade(random: true),
+                  ),
+                )
+              : _config.presenter.buildBattleView(
+                  _presentationData(),
+                  BattlePresentationCallbacks(
+                    onPointerDown: () => _audio.playClickSfx(
+                      enabled: _config.audio.clickSound.isNotEmpty,
+                    ),
+                    onLeftLockToggle: () => _updateState(
+                      (state) => state.copyWith(leftLocked: !state.leftLocked),
+                    ),
+                    onRightLockToggle: () => _updateState(
+                      (state) => state.copyWith(rightLocked: !state.rightLocked),
+                    ),
+                    onLeftBeyChanged: (bey) =>
+                        _updateState((state) => state.copyWith(leftBey: bey)),
+                    onRightBeyChanged: (bey) =>
+                        _updateState((state) => state.copyWith(rightBey: bey)),
+                    onPlay: _startCountdown,
+                    onWarning: () => _triggerFinishAnimation('WARNING'),
+                    onLeftSpinFinish: () => _triggerFinishAnimation(
+                      'SPIN FINISH',
+                      isLeft: true,
+                      points: 1,
+                    ),
+                    onLeftOverFinish: () => _triggerFinishAnimation(
+                      'OVER FINISH',
+                      isLeft: true,
+                      points: 2,
+                    ),
+                    onRightSpinFinish: () => _triggerFinishAnimation(
+                      'SPIN FINISH',
+                      isLeft: false,
+                      points: 1,
+                    ),
+                    onRightOverFinish: () => _triggerFinishAnimation(
+                      'OVER FINISH',
+                      isLeft: false,
+                      points: 2,
+                    ),
+                    onToggleMusic: _toggleMusic,
+                    onSkipTrack: () => _audio.handleCrossfade(random: true),
+                    onResetScores: _resetScores,
+                    onCloseVideo: _closeVideo,
+                  ),
                 ),
-              )
-            : _config.presenter.buildBattleView(
-                _presentationData(),
-                BattlePresentationCallbacks(
-                  onPointerDown: () => _audio.playClickSfx(
-                    enabled: _config.audio.clickSound.isNotEmpty,
-                  ),
-                  onLeftLockToggle: () => _updateState(
-                    (state) => state.copyWith(leftLocked: !state.leftLocked),
-                  ),
-                  onRightLockToggle: () => _updateState(
-                    (state) => state.copyWith(rightLocked: !state.rightLocked),
-                  ),
-                  onLeftBeyChanged: (bey) =>
-                      _updateState((state) => state.copyWith(leftBey: bey)),
-                  onRightBeyChanged: (bey) =>
-                      _updateState((state) => state.copyWith(rightBey: bey)),
-                  onPlay: _startCountdown,
-                  onWarning: () => _triggerFinishAnimation('WARNING'),
-                  onLeftSpinFinish: () => _triggerFinishAnimation(
-                    'SPIN FINISH',
-                    isLeft: true,
-                    points: 1,
-                  ),
-                  onLeftOverFinish: () => _triggerFinishAnimation(
-                    'OVER FINISH',
-                    isLeft: true,
-                    points: 2,
-                  ),
-                  onRightSpinFinish: () => _triggerFinishAnimation(
-                    'SPIN FINISH',
-                    isLeft: false,
-                    points: 1,
-                  ),
-                  onRightOverFinish: () => _triggerFinishAnimation(
-                    'OVER FINISH',
-                    isLeft: false,
-                    points: 2,
-                  ),
-                  onToggleMusic: _toggleMusic,
-                  onSkipTrack: () => _audio.handleCrossfade(random: true),
-                  onResetScores: _resetScores,
-                  onCloseVideo: _closeVideo,
-                ),
-              ),
+        ),
       ),
     );
   }
