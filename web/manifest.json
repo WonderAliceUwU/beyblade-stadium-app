@@ -1,6 +1,6 @@
 {
-    "name": "beyblade_stadium",
-    "short_name": "beyblade_stadium",
+    "name": "Beyblade Stadium App",
+    "short_name": "Beyblade Stadium App",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
