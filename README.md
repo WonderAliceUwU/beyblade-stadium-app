@@ -4,6 +4,10 @@ A stylized local Beyblade battle companion built with Flutter.
 
 It currently includes a Metal Fight battle flow with animated bey selection, round intros, countdowns, finish calls, winner screens, music playback, voice clips, and keyboard shortcuts. The codebase is also now structured so a full Beyblade X presentation can be added on top of the same game logic without rebuilding the whole screen from scratch.
 
+## Screenshot
+
+![Beyblade Stadium gameplay screenshot](docs/images/screenshot-game.png)
+
 ## Features
 
 - Metal Fight themed battle screen with custom fonts, music, finish calls, and motif effects
