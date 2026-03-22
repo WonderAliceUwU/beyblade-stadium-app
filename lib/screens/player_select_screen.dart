@@ -475,6 +475,7 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
 
   Future<void> _triggerFinishAnimation(String text, {bool? isLeft, int? points}) async {
     if (_isAnimatingFinish && !_finishText.startsWith('ROUND')) return;
+    final shouldAdvanceRound = isLeft != null && points != null && points > 0;
     
     _finishOverlayController.reset();
 
@@ -539,7 +540,9 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
         rightLocked = false;
         _isAnimatingFinish = false;
         _finishText = '';
-        currentRound++;
+        if (shouldAdvanceRound) {
+          currentRound++;
+        }
         
         _handleCrossfade(random: true);
 
@@ -958,7 +961,7 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
                               child: ImageFiltered(
                                 imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
                                 child: Image.asset(
-                                  'assets/metal/images/motifs/${winBey.motif}.png',
+                                  winBey.motifAsset,
                                   color: winColor,
                                   colorBlendMode: BlendMode.srcIn,
                                   height: 800,
@@ -970,7 +973,7 @@ class _PlayerSelectScreenState extends State<PlayerSelectScreen>
                             Opacity(
                               opacity: 0.4 + (_winMotifController.value * 0.2),
                               child: Image.asset(
-                                'assets/metal/images/motifs/${winBey.motif}.png',
+                                winBey.motifAsset,
                                 // Using modulate at lower intensity keeps details and original colors
                                 color: winColor.withOpacity(0.3),
                                 colorBlendMode: BlendMode.modulate,

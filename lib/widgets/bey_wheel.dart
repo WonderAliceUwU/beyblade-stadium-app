@@ -12,12 +12,20 @@ class BeyInfo {
   final String motif;
   final BeyType type;
   final SpinDirection spin;
+  final double imageScale;
+  final String? selectVoiceOverride;
+  final List<String>? winVoicesOverride;
+  final String? winNameOverride;
 
   const BeyInfo({
     required this.name,
     required this.motif,
     required this.type,
     this.spin = SpinDirection.clockwise,
+    this.imageScale = 1.0,
+    this.selectVoiceOverride,
+    this.winVoicesOverride,
+    this.winNameOverride,
   });
 
   String get typeLogo {
@@ -33,7 +41,10 @@ class BeyInfo {
     }
   }
 
+  String get motifAsset => 'assets/metal/images/motifs/$motif.png';
+
   String get selectVoice {
+    if (selectVoiceOverride != null) return selectVoiceOverride!;
     switch (motif) {
       case 'drago':
         return 'metal/sounds/bey-select/L-Drago Select.mp3';
@@ -51,12 +62,15 @@ class BeyInfo {
         return 'metal/sounds/bey-select/Sagittario Select.mp3';
       case 'wolf':
         return 'metal/sounds/bey-select/Wolf Select.mp3';
+      case 'unicorn':
+        return 'metal/sounds/bey-select/Unicorn Select.mp3';
       default:
         return 'metal/sounds/select.mp3';
     }
   }
 
   List<String> get winVoices {
+    if (winVoicesOverride != null) return winVoicesOverride!;
     switch (motif) {
       case 'drago':
         return ['metal/sounds/bey-win/Drago Win.mp3'];
@@ -74,12 +88,15 @@ class BeyInfo {
         return ['metal/sounds/bey-win/Sagittario Win.mp3', 'metal/sounds/bey-win/Sagittario Win 2.mp3'];
       case 'wolf':
         return ['metal/sounds/bey-win/Wolf Win.mp3', 'metal/sounds/bey-win/Wolf Win 2.mp3'];
+      case 'unicorn':
+        return ['metal/sounds/bey-win/Unicorn Win.mp3'];
       default:
         return ['metal/sounds/select.mp3'];
     }
   }
 
   String get winName {
+    if (winNameOverride != null) return winNameOverride!;
     switch (motif) {
       case 'drago':
         return 'L-Drago';
@@ -97,6 +114,8 @@ class BeyInfo {
         return 'Sagittario';
       case 'wolf':
         return 'Wolf';
+      case 'unicorn':
+        return 'Unicorn';
       default:
         return name.split(' ')[1];
     }
@@ -152,6 +171,21 @@ class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
         type: BeyType.stamina),
     const BeyInfo(
         name: "Dark Wolf DF-145FS", motif: "wolf", type: BeyType.balance),
+    const BeyInfo(
+      name: "Ray Unicorn D-125CS",
+      motif: "unicorn",
+      type: BeyType.balance,
+      imageScale: 1.22,
+    ),
+    const BeyInfo(
+      name: "Samurai Pegasus W-125R2F",
+      motif: "samurai-pegasus",
+      type: BeyType.attack,
+      imageScale: 1.22,
+      selectVoiceOverride: 'metal/sounds/bey-select/samurai-pegasus.mp3',
+      winVoicesOverride: ['metal/sounds/bey-win/Samurai-Pegasus Win.mp3'],
+      winNameOverride: 'Samurai Pegasus',
+    ),
   ];
 
   late FixedExtentScrollController _scrollController;
@@ -208,7 +242,7 @@ class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
     super.didChangeDependencies();
     for (var bey in beys) {
       precacheImage(AssetImage('assets/metal/images/beys/${bey.name}.png'), context);
-      precacheImage(AssetImage('assets/metal/images/motifs/${bey.motif}.png'), context);
+      precacheImage(AssetImage(bey.motifAsset), context);
       precacheImage(AssetImage(bey.typeLogo), context);
     }
   }
@@ -320,7 +354,7 @@ class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
                           child: ImageFiltered(
                             imageFilter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
                             child: Image.asset(
-                              'assets/metal/images/motifs/${currentBey.motif}.png',
+                              currentBey.motifAsset,
                               color: widget.color,
                               colorBlendMode: BlendMode.srcIn,
                               fit: BoxFit.contain,
@@ -332,7 +366,7 @@ class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
                         Opacity(
                           opacity: _motifOpacity.value * 0.9,
                           child: Image.asset(
-                            'assets/metal/images/motifs/${currentBey.motif}.png',
+                            currentBey.motifAsset,
                             color: widget.color.withOpacity(0.6),
                             colorBlendMode: BlendMode.modulate, // Shows details instead of silhouette
                             fit: BoxFit.contain,
@@ -439,15 +473,18 @@ class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
                                                   ),
                                                 ],
                                               ) : null,
-                                              child: Image.asset(
-                                                'assets/metal/images/beys/${bey.name}.png',
-                                                height: 350,
-                                                width: 350,
-                                                fit: BoxFit.contain,
-                                                gaplessPlayback: true,
-                                                errorBuilder: (context, error, stackTrace) {
-                                                  return const Icon(Icons.error_outline, color: Colors.red, size: 80);
-                                                },
+                                              child: Transform.scale(
+                                                scale: bey.imageScale,
+                                                child: Image.asset(
+                                                  'assets/metal/images/beys/${bey.name}.png',
+                                                  height: 350,
+                                                  width: 350,
+                                                  fit: BoxFit.contain,
+                                                  gaplessPlayback: true,
+                                                  errorBuilder: (context, error, stackTrace) {
+                                                    return const Icon(Icons.error_outline, color: Colors.red, size: 80);
+                                                  },
+                                                ),
                                               ),
                                             ),
                                           ),
