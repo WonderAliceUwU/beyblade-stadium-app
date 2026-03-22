@@ -13,6 +13,9 @@ class BeyInfo {
   final BeyType type;
   final SpinDirection spin;
   final double imageScale;
+  final String? imageAssetOverride;
+  final String? typeLogoOverride;
+  final String? motifAssetOverride;
   final String? selectVoiceOverride;
   final List<String>? winVoicesOverride;
   final String? winNameOverride;
@@ -23,12 +26,16 @@ class BeyInfo {
     required this.type,
     this.spin = SpinDirection.clockwise,
     this.imageScale = 1.0,
+    this.imageAssetOverride,
+    this.typeLogoOverride,
+    this.motifAssetOverride,
     this.selectVoiceOverride,
     this.winVoicesOverride,
     this.winNameOverride,
   });
 
   String get typeLogo {
+    if (typeLogoOverride != null) return typeLogoOverride!;
     switch (type) {
       case BeyType.attack:
         return 'assets/metal/images/attack-logo.webp';
@@ -41,7 +48,10 @@ class BeyInfo {
     }
   }
 
-  String get motifAsset => 'assets/metal/images/motifs/$motif.png';
+  String get imageAsset => imageAssetOverride ?? 'assets/metal/images/beys/$name.png';
+
+  String get motifAsset =>
+      motifAssetOverride ?? 'assets/metal/images/motifs/$motif.png';
 
   String get selectVoice {
     if (selectVoiceOverride != null) return selectVoiceOverride!;
@@ -131,6 +141,7 @@ class BeyWheel extends StatefulWidget {
   final bool isLeft;
   final ValueChanged<BeyInfo>? onBeyChanged;
   final bool interactionEnabled;
+  final List<BeyInfo> beys;
 
   const BeyWheel({
     super.key,
@@ -140,6 +151,7 @@ class BeyWheel extends StatefulWidget {
     required this.onLock,
     required this.fontFamily,
     required this.isLeft,
+    required this.beys,
     this.onBeyChanged,
     this.interactionEnabled = true,
   });
@@ -149,45 +161,6 @@ class BeyWheel extends StatefulWidget {
 }
 
 class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
-  final List<BeyInfo> beys = [
-    const BeyInfo(
-        name: "Storm Pegasus 105RF", motif: "pegasis", type: BeyType.attack),
-    const BeyInfo(
-        name: "Lightning L-Drago 100HF",
-        motif: "drago",
-        type: BeyType.attack,
-        spin: SpinDirection.counterClockwise),
-    const BeyInfo(
-        name: "Storm Aquario 100HF:S", motif: "aquario", type: BeyType.attack),
-    const BeyInfo(
-        name: "Earth Aquila 145WD", motif: "aquila", type: BeyType.defense),
-    const BeyInfo(
-        name: "Rock Leone 145WB", motif: "leone", type: BeyType.defense),
-    const BeyInfo(
-        name: "Burn Phoenix 135MS", motif: "phoenix", type: BeyType.stamina),
-    const BeyInfo(
-        name: "Flame Sagittario C-145S",
-        motif: "sagittario",
-        type: BeyType.stamina),
-    const BeyInfo(
-        name: "Dark Wolf DF-145FS", motif: "wolf", type: BeyType.balance),
-    const BeyInfo(
-      name: "Ray Unicorn D-125CS",
-      motif: "unicorn",
-      type: BeyType.balance,
-      imageScale: 1.22,
-    ),
-    const BeyInfo(
-      name: "Samurai Pegasus W-125R2F",
-      motif: "samurai-pegasus",
-      type: BeyType.attack,
-      imageScale: 1.22,
-      selectVoiceOverride: 'metal/sounds/bey-select/samurai-pegasus.mp3',
-      winVoicesOverride: ['metal/sounds/bey-win/Samurai-Pegasus Win.mp3'],
-      winNameOverride: 'Samurai Pegasus',
-    ),
-  ];
-
   late FixedExtentScrollController _scrollController;
   late AnimationController _spinController;
   late Animation<double> _spinAnimation;
@@ -232,7 +205,7 @@ class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
     // Initial notification
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.onBeyChanged != null) {
-        widget.onBeyChanged!(beys[_getRealIndex(_localIndex)]);
+        widget.onBeyChanged!(widget.beys[_getRealIndex(_localIndex)]);
       }
     });
   }
@@ -240,8 +213,8 @@ class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    for (var bey in beys) {
-      precacheImage(AssetImage('assets/metal/images/beys/${bey.name}.png'), context);
+    for (var bey in widget.beys) {
+      precacheImage(AssetImage(bey.imageAsset), context);
       precacheImage(AssetImage(bey.motifAsset), context);
       precacheImage(AssetImage(bey.typeLogo), context);
     }
@@ -264,7 +237,7 @@ class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
   }
 
   Future<void> _playSelectVoice() async {
-    final currentBey = beys[_getRealIndex(_localIndex)];
+    final currentBey = widget.beys[_getRealIndex(_localIndex)];
     final source = AssetSource(currentBey.selectVoice);
     
     // Main voice - LOWERED VOLUME
@@ -300,8 +273,8 @@ class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
   }
 
   int _getRealIndex(int index) {
-    if (beys.isEmpty) return 0;
-    return (index % beys.length + beys.length) % beys.length;
+    if (widget.beys.isEmpty) return 0;
+    return (index % widget.beys.length + widget.beys.length) % widget.beys.length;
   }
 
   void _nextBey() {
@@ -324,6 +297,7 @@ class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final beys = widget.beys;
     final currentBey = beys[_getRealIndex(_localIndex)];
 
     return Stack(
@@ -476,7 +450,7 @@ class _BeyWheelState extends State<BeyWheel> with TickerProviderStateMixin {
                                               child: Transform.scale(
                                                 scale: bey.imageScale,
                                                 child: Image.asset(
-                                                  'assets/metal/images/beys/${bey.name}.png',
+                                                  bey.imageAsset,
                                                   height: 350,
                                                   width: 350,
                                                   fit: BoxFit.contain,
